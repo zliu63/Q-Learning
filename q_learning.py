@@ -119,6 +119,12 @@ def get_action_index(readout_t, epsilon, t):
     """
 
     action_index = 0
+    rv = np.random.rand()
+    l = readout_t.shape[0]
+    if t < OBSERVE or rv < epsilon:
+        action_index = np.random.randint(low = 0, high = l)
+    else:
+        action_index = np.argmax(readout_t)
 
     return action_index
 
@@ -133,8 +139,11 @@ def scale_down_epsilon(epsilon, t):
     Returns:
         the updated epsilon
     """
-
-    return epsilon
+    if epsilon > FINAL_EPSILON and t > OBSERVE:
+        ret =  epsilon - ((INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE)
+    else:
+        ret = epsilon
+    return ret
 
 
 def run_selected_action(a_t, s_t, game_state):
@@ -150,7 +159,12 @@ def run_selected_action(a_t, s_t, game_state):
         r_t: reward.
         terminal: indicating whether the episode terminated (output of the simulator).
     """
-
+    f_t, r_t, terminal = game_state.frame_step(a_t)
+    f_t = cv2.cvtColor(cv2.resize(f_t, (80, 80)), cv2.COLOR_BGR2GRAY)
+    _, f_t = cv2.threshold(f_t, 1, 255, cv2.THRESH_BINARY)
+    f_t = f_t.reshape((s_t.shape[0], s_t.shape[1], 1))
+    s_t1 = np.concatenate((s_t,f_t), axis = 2)
+    s_t1 = np.delete(s_t1, 0, 2)
     return s_t1, r_t, terminal
 
 
@@ -167,7 +181,7 @@ def compute_cost(target_q, a_t, q_value):
     readout_action = tf.reduce_sum(tf.multiply(q_value, a_t), reduction_indices=1)
 
     # Q-Learning Cost.
-    cost = tf.reduce_mean(tf.square(target_q - q_value))
+    cost = tf.reduce_mean(tf.square(target_q - readout_action)) # lzy-bug
 
     return cost
 
@@ -188,9 +202,18 @@ def compute_target_q(r_batch, readout_j1_batch, terminal_batch):
     """
 
     target_q_batch = []
-
+    print('len(terminal_batch) = {}'.format(len(terminal_batch)))
     for i in range(0, len(terminal_batch)):
         # If the terminal state is reached, the Q-value is only equal to the reward.
+        if terminal_batch[i]:
+            # case(1): terminal state
+            yj = r_batch[i]
+            target_q_batch.append(yj)
+        else:
+            # case(2): non terminal state
+            yj = r_batch[i] + GAMMA*max(readout_j1_batch[i])
+            target_q_batch.append(yj)
+
 
     return target_q_batch
 
@@ -274,7 +297,7 @@ def trainNetwork(s, readout, sess):
         if (t > OBSERVE):
 
             # Sample a minibatch to train on.
-            minibatch = random.sample(D, BATCH)
+            minibatch = random.sample(list(D), BATCH) #lzy-bug
 
             # Get the batch variables.
             s_j_batch = [d[0] for d in minibatch]
