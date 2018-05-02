@@ -120,7 +120,7 @@ def get_action_index(readout_t, epsilon, t):
 
     action_index = 0
     rv = np.random.rand()
-    l = readout_t.shape[0]
+    l = len(readout_t)
     if t < OBSERVE or rv < epsilon:
         action_index = np.random.randint(low = 0, high = l)
     else:
