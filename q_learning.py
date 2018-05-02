@@ -202,7 +202,6 @@ def compute_target_q(r_batch, readout_j1_batch, terminal_batch):
     """
 
     target_q_batch = []
-    print('len(terminal_batch) = {}'.format(len(terminal_batch)))
     for i in range(0, len(terminal_batch)):
         # If the terminal state is reached, the Q-value is only equal to the reward.
         if terminal_batch[i]:
